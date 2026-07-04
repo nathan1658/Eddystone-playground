@@ -6,6 +6,13 @@ beacon where the operating system allows it.
 
 Public repository: <https://github.com/nathan1658/Eddystone-playground>
 
+## Screenshots
+
+<p>
+  <img src="docs/screenshots/scan.jpg" alt="Beacon scan screen" width="260">
+  <img src="docs/screenshots/advertise.jpg" alt="Beacon advertise screen" width="260">
+</p>
+
 ## What It Does
 
 - Runs on Android and iOS.
