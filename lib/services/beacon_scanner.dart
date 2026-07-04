@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -29,10 +28,16 @@ class FlutterBeaconScanner extends BeaconScanner {
   FlutterBeaconScanner({BeaconParser? parser})
     : _parser = parser ?? BeaconParser();
 
+  static const _scanUiUpdateInterval = Duration(milliseconds: 900);
+
   final BeaconParser _parser;
   final Map<String, BeaconDevice> _devices = {};
+  final Map<String, int> _deviceRanks = {};
   final List<StreamSubscription<Object?>> _subscriptions = [];
   Timer? _refreshTimer;
+  Timer? _pendingScanNotify;
+  DateTime? _lastScanNotifyAt;
+  int _nextDeviceRank = 0;
   bool _isScanning = false;
   bool _isSupported = true;
   String _statusText = 'Starting Bluetooth scan';
@@ -41,11 +46,13 @@ class FlutterBeaconScanner extends BeaconScanner {
   List<BeaconDevice> get devices {
     final sorted = _devices.values.toList()
       ..sort((a, b) {
-        final bySeen = b.lastSeen.compareTo(a.lastSeen);
-        if (bySeen != 0) {
-          return bySeen;
+        final byRank = (_deviceRanks[a.id] ?? 0).compareTo(
+          _deviceRanks[b.id] ?? 0,
+        );
+        if (byRank != 0) {
+          return byRank;
         }
-        return b.rssi.compareTo(a.rssi);
+        return a.id.compareTo(b.id);
       });
     return sorted;
   }
@@ -64,7 +71,7 @@ class FlutterBeaconScanner extends BeaconScanner {
     _isSupported = await FlutterBluePlus.isSupported;
     if (!_isSupported) {
       _statusText = 'Bluetooth LE is not supported on this device';
-      notifyListeners();
+      _notifyImmediately();
       return;
     }
 
@@ -72,8 +79,9 @@ class FlutterBeaconScanner extends BeaconScanner {
     _listenOnce();
     await _beginScan();
     _refreshTimer ??= Timer.periodic(const Duration(seconds: 2), (_) {
-      _removeStaleDevices();
-      notifyListeners();
+      if (_removeStaleDevices()) {
+        _scheduleScanNotify();
+      }
     });
   }
 
@@ -91,7 +99,7 @@ class FlutterBeaconScanner extends BeaconScanner {
     }
     _isScanning = false;
     _statusText = 'Scan paused';
-    notifyListeners();
+    _notifyImmediately();
   }
 
   void _listenOnce() {
@@ -106,14 +114,14 @@ class FlutterBeaconScanner extends BeaconScanner {
         } else {
           _statusText = 'Bluetooth is ${state.name}';
         }
-        notifyListeners();
+        _notifyImmediately();
       }),
     );
 
     _subscriptions.add(
       FlutterBluePlus.isScanning.listen((isScanning) {
         _isScanning = isScanning;
-        notifyListeners();
+        _notifyImmediately();
       }),
     );
 
@@ -122,14 +130,17 @@ class FlutterBeaconScanner extends BeaconScanner {
         (results) {
           for (final result in results) {
             final device = _parser.parseScanResult(result);
+            _deviceRanks.putIfAbsent(device.id, () => _nextDeviceRank++);
             _devices[device.id] = device;
           }
-          _removeStaleDevices();
-          notifyListeners();
+          final removedStaleDevices = _removeStaleDevices();
+          if (results.isNotEmpty || removedStaleDevices) {
+            _scheduleScanNotify();
+          }
         },
         onError: (Object error) {
           _statusText = 'Scan error: $error';
-          notifyListeners();
+          _notifyImmediately();
         },
       ),
     );
@@ -138,18 +149,18 @@ class FlutterBeaconScanner extends BeaconScanner {
   Future<void> _beginScan() async {
     try {
       _statusText = 'Scanning nearby BLE packets';
-      notifyListeners();
+      _notifyImmediately();
       await FlutterBluePlus.startScan(
         continuousUpdates: true,
         continuousDivisor: 2,
         removeIfGone: const Duration(seconds: 14),
         androidScanMode: AndroidScanMode.lowLatency,
-        androidUsesFineLocation: false,
+        androidUsesFineLocation: true,
         androidCheckLocationServices: false,
       );
     } catch (error) {
       _statusText = 'Unable to scan: $error';
-      notifyListeners();
+      _notifyImmediately();
     }
   }
 
@@ -171,9 +182,47 @@ class FlutterBeaconScanner extends BeaconScanner {
     }
   }
 
-  void _removeStaleDevices() {
+  bool _removeStaleDevices() {
     final cutoff = DateTime.now().subtract(const Duration(seconds: 20));
-    _devices.removeWhere((_, device) => device.lastSeen.isBefore(cutoff));
+    var removed = false;
+    _devices.removeWhere((id, device) {
+      final isStale = device.lastSeen.isBefore(cutoff);
+      if (isStale) {
+        removed = true;
+        _deviceRanks.remove(id);
+      }
+      return isStale;
+    });
+    return removed;
+  }
+
+  void _scheduleScanNotify() {
+    if (_pendingScanNotify != null) {
+      return;
+    }
+    final now = DateTime.now();
+    final lastNotifyAt = _lastScanNotifyAt;
+    if (lastNotifyAt == null ||
+        now.difference(lastNotifyAt) >= _scanUiUpdateInterval) {
+      _lastScanNotifyAt = now;
+      notifyListeners();
+      return;
+    }
+    _pendingScanNotify = Timer(
+      _scanUiUpdateInterval - now.difference(lastNotifyAt),
+      () {
+        _pendingScanNotify = null;
+        _lastScanNotifyAt = DateTime.now();
+        notifyListeners();
+      },
+    );
+  }
+
+  void _notifyImmediately() {
+    _pendingScanNotify?.cancel();
+    _pendingScanNotify = null;
+    _lastScanNotifyAt = DateTime.now();
+    notifyListeners();
   }
 
   String _platformScanNote() {
@@ -189,6 +238,7 @@ class FlutterBeaconScanner extends BeaconScanner {
       subscription.cancel();
     }
     _refreshTimer?.cancel();
+    _pendingScanNotify?.cancel();
     super.dispose();
   }
 }
@@ -210,10 +260,7 @@ class MemoryBeaconScanner extends BeaconScanner {
   final bool _isSupported;
 
   @override
-  List<BeaconDevice> get devices => _devices.sortedByCompare(
-    (device) => device.lastSeen,
-    (a, b) => b.compareTo(a),
-  );
+  List<BeaconDevice> get devices => _devices;
 
   @override
   bool get isScanning => _isScanning;

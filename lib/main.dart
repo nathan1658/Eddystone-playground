@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -10,10 +11,247 @@ import 'models/beacon_annotation.dart';
 import 'models/beacon_device.dart';
 import 'services/annotation_store.dart';
 import 'services/beacon_advertiser.dart';
+import 'services/beacon_diagnostics.dart';
 import 'services/beacon_scanner.dart';
 
 void main() {
   runApp(const BeaconApp());
+}
+
+abstract final class Gds {
+  static const googleBlue = Color(0xff4285f4);
+  static const googleBlue700 = Color(0xff1a73e8);
+  static const googleRed600 = Color(0xffd93025);
+  static const googleYellow700 = Color(0xfff29900);
+  static const googleGreen700 = Color(0xff1e8e3e);
+  static const grey0 = Color(0xffffffff);
+  static const grey50 = Color(0xfff8f9fa);
+  static const grey100 = Color(0xfff1f3f4);
+  static const grey200 = Color(0xffe8eaed);
+  static const grey300 = Color(0xffdadce0);
+  static const grey400 = Color(0xffbdc1c6);
+  static const grey600 = Color(0xff80868b);
+  static const grey700 = Color(0xff5f6368);
+  static const grey800 = Color(0xff3c4043);
+  static const grey900 = Color(0xff202124);
+  static const blue50 = Color(0xffe8f0fe);
+  static const green50 = Color(0xffe6f4ea);
+  static const red50 = Color(0xfffce8e6);
+  static const yellow50 = Color(0xfffff7e0);
+  static const radiusXs = 4.0;
+  static const radiusSm = 8.0;
+  static const radiusMd = 12.0;
+  static const controlSm = 32.0;
+  static const controlMd = 36.0;
+
+  static ThemeData theme() {
+    final colorScheme = ColorScheme.fromSeed(
+      seedColor: googleBlue700,
+      brightness: Brightness.light,
+      primary: googleBlue700,
+      secondary: googleGreen700,
+      tertiary: googleYellow700,
+      error: googleRed600,
+      surface: grey0,
+      surfaceContainerHighest: grey100,
+      outline: grey300,
+      outlineVariant: grey200,
+    );
+    final base = ThemeData(
+      colorScheme: colorScheme,
+      useMaterial3: true,
+      scaffoldBackgroundColor: grey0,
+      fontFamily: 'Google Sans Flex',
+    );
+    final textTheme = base.textTheme.apply(
+      bodyColor: grey900,
+      displayColor: grey900,
+      fontFamily: 'Google Sans Flex',
+    );
+    final pill = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(999),
+    );
+    return base.copyWith(
+      textTheme: textTheme.copyWith(
+        headlineMedium: textTheme.headlineMedium?.copyWith(
+          fontSize: 26,
+          height: 36 / 26,
+          fontWeight: FontWeight.w500,
+          letterSpacing: -0.26,
+        ),
+        titleLarge: textTheme.titleLarge?.copyWith(
+          fontSize: 22,
+          height: 28 / 22,
+          fontWeight: FontWeight.w500,
+        ),
+        titleMedium: textTheme.titleMedium?.copyWith(
+          fontSize: 16,
+          height: 24 / 16,
+          fontWeight: FontWeight.w500,
+        ),
+        bodyMedium: textTheme.bodyMedium?.copyWith(
+          fontSize: 14,
+          height: 20 / 14,
+          letterSpacing: 0.1,
+        ),
+        bodySmall: textTheme.bodySmall?.copyWith(
+          fontSize: 12,
+          height: 16 / 12,
+          letterSpacing: 0.2,
+        ),
+        labelLarge: textTheme.labelLarge?.copyWith(
+          fontSize: 14,
+          height: 20 / 14,
+          fontWeight: FontWeight.w500,
+          letterSpacing: 0,
+        ),
+        labelMedium: textTheme.labelMedium?.copyWith(
+          fontSize: 12,
+          height: 16 / 12,
+          fontWeight: FontWeight.w500,
+          letterSpacing: 0.1,
+        ),
+      ),
+      appBarTheme: const AppBarTheme(
+        backgroundColor: grey0,
+        foregroundColor: grey900,
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+      ),
+      cardTheme: CardThemeData(
+        elevation: 0,
+        margin: EdgeInsets.zero,
+        color: grey0,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          side: const BorderSide(color: grey300),
+          borderRadius: BorderRadius.circular(radiusMd),
+        ),
+      ),
+      dividerTheme: const DividerThemeData(
+        color: grey200,
+        thickness: 1,
+        space: 1,
+      ),
+      iconButtonTheme: IconButtonThemeData(
+        style: IconButton.styleFrom(
+          foregroundColor: grey700,
+          minimumSize: const Size(controlMd, controlMd),
+          fixedSize: const Size(controlMd, controlMd),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(radiusSm),
+          ),
+          hoverColor: grey50,
+          highlightColor: grey100,
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size(0, controlMd),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          foregroundColor: grey900,
+          side: const BorderSide(color: grey300),
+          shape: pill,
+          textStyle: textTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.w500,
+            letterSpacing: 0,
+          ),
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          minimumSize: const Size(0, controlMd),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          backgroundColor: googleBlue700,
+          foregroundColor: grey0,
+          shape: pill,
+          textStyle: textTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.w500,
+            letterSpacing: 0,
+          ),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: googleBlue700,
+          minimumSize: const Size(0, controlMd),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          shape: pill,
+          textStyle: textTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.w500,
+            letterSpacing: 0,
+          ),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: grey0,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 12,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(radiusSm),
+          borderSide: const BorderSide(color: grey300),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(radiusSm),
+          borderSide: const BorderSide(color: grey300),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(radiusSm),
+          borderSide: const BorderSide(color: googleBlue700, width: 2),
+        ),
+        labelStyle: const TextStyle(color: grey700, fontSize: 12),
+        prefixIconColor: grey600,
+        suffixStyle: const TextStyle(color: grey700, fontSize: 12),
+      ),
+      segmentedButtonTheme: SegmentedButtonThemeData(
+        style: ButtonStyle(
+          minimumSize: const WidgetStatePropertyAll(Size(0, 28)),
+          visualDensity: VisualDensity.compact,
+          padding: const WidgetStatePropertyAll(
+            EdgeInsets.symmetric(horizontal: 14),
+          ),
+          backgroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return grey0;
+            }
+            return grey100;
+          }),
+          foregroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return grey900;
+            }
+            return grey700;
+          }),
+          side: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return const BorderSide(color: grey300);
+            }
+            return BorderSide.none;
+          }),
+          shape: WidgetStatePropertyAll(pill),
+          textStyle: WidgetStatePropertyAll(
+            textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w500),
+          ),
+        ),
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: grey0,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: grey0,
+        indicatorColor: grey200,
+        labelTextStyle: WidgetStatePropertyAll(textTheme.labelMedium),
+        iconTheme: const WidgetStatePropertyAll(IconThemeData(size: 20)),
+      ),
+    );
+  }
 }
 
 class BeaconApp extends StatelessWidget {
@@ -30,26 +268,10 @@ class BeaconApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = ColorScheme.fromSeed(
-      seedColor: const Color(0xff006d77),
-      secondary: const Color(0xff7a4e9a),
-      tertiary: const Color(0xffc77d00),
-      brightness: Brightness.light,
-    );
     return MaterialApp(
       title: 'Eddystone Playground',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: colorScheme,
-        useMaterial3: true,
-        cardTheme: const CardThemeData(
-          elevation: 0,
-          margin: EdgeInsets.zero,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(8)),
-          ),
-        ),
-      ),
+      theme: Gds.theme(),
       home: BeaconHomePage(
         scanner: scanner,
         annotationStore: annotationStore,
@@ -81,6 +303,10 @@ class _BeaconHomePageState extends State<BeaconHomePage> {
       widget.annotationStore ?? SharedPreferencesAnnotationStore();
   late final BeaconAdvertiser _advertiser =
       widget.advertiser ?? MethodChannelBeaconAdvertiser();
+  late final BeaconDiagnostics _diagnostics = BeaconDiagnostics(
+    scanner: _scanner,
+    advertiser: _advertiser,
+  );
 
   int _selectedIndex = 0;
 
@@ -89,6 +315,7 @@ class _BeaconHomePageState extends State<BeaconHomePage> {
     super.initState();
     unawaited(_annotationStore.load());
     unawaited(_scanner.start());
+    unawaited(_diagnostics.start());
   }
 
   @override
@@ -99,6 +326,7 @@ class _BeaconHomePageState extends State<BeaconHomePage> {
     if (widget.annotationStore == null) {
       _annotationStore.dispose();
     }
+    _diagnostics.dispose();
     super.dispose();
   }
 
@@ -109,33 +337,182 @@ class _BeaconHomePageState extends State<BeaconHomePage> {
       _ => AdvertisePage(advertiser: _advertiser),
     };
 
+    return AnimatedBuilder(
+      animation: _scanner,
+      builder: (context, _) {
+        return _StudioShell(
+          selectedIndex: _selectedIndex,
+          scanner: _scanner,
+          onDestinationSelected: (index) {
+            setState(() => _selectedIndex = index);
+          },
+          child: body,
+        );
+      },
+    );
+  }
+}
+
+class _StudioShell extends StatelessWidget {
+  const _StudioShell({
+    required this.selectedIndex,
+    required this.onDestinationSelected,
+    required this.scanner,
+    required this.child,
+  });
+
+  final int selectedIndex;
+  final ValueChanged<int> onDestinationSelected;
+  final BeaconScanner scanner;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Eddystone Playground'),
-        actions: [
-          IconButton(
-            tooltip: _scanner.isScanning ? 'Pause scan' : 'Start scan',
-            onPressed: () {
-              if (_scanner.isScanning) {
-                unawaited(_scanner.stop());
-              } else {
-                unawaited(_scanner.start());
-              }
-            },
-            icon: Icon(_scanner.isScanning ? Icons.pause : Icons.play_arrow),
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final showTopNavigation = constraints.maxWidth >= 640;
+            return Column(
+              children: [
+                _StudioTopBar(
+                  scanner: scanner,
+                  selectedIndex: selectedIndex,
+                  onDestinationSelected: onDestinationSelected,
+                  showNavigation: showTopNavigation,
+                ),
+                Expanded(child: child),
+              ],
+            );
+          },
+        ),
+      ),
+      bottomNavigationBar: LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxWidth >= 640) {
+            return const SizedBox.shrink();
+          }
+          return DecoratedBox(
+            decoration: const BoxDecoration(
+              border: Border(top: BorderSide(color: Gds.grey200)),
+            ),
+            child: NavigationBar(
+              height: 64,
+              selectedIndex: selectedIndex,
+              onDestinationSelected: onDestinationSelected,
+              destinations: const [
+                NavigationDestination(icon: Icon(Icons.radar), label: 'Scan'),
+                NavigationDestination(
+                  icon: Icon(Icons.sensors),
+                  label: 'Advertise',
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _StudioTopBar extends StatelessWidget {
+  const _StudioTopBar({
+    required this.scanner,
+    required this.selectedIndex,
+    required this.onDestinationSelected,
+    required this.showNavigation,
+  });
+
+  final BeaconScanner scanner;
+  final int selectedIndex;
+  final ValueChanged<int> onDestinationSelected;
+  final bool showNavigation;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 54,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: const BoxDecoration(
+        color: Gds.grey0,
+        border: Border(bottom: BorderSide(color: Gds.grey200)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              'Eddystone playground',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+          ),
+          if (showNavigation) ...[
+            const SizedBox(width: 12),
+            SegmentedButton<int>(
+              showSelectedIcon: false,
+              segments: const [
+                ButtonSegment(
+                  value: 0,
+                  icon: Icon(Icons.radar),
+                  label: Text('Scan'),
+                ),
+                ButtonSegment(
+                  value: 1,
+                  icon: Icon(Icons.sensors),
+                  label: Text('Advertise'),
+                ),
+              ],
+              selected: {selectedIndex},
+              onSelectionChanged: (selection) {
+                onDestinationSelected(selection.first);
+              },
+            ),
+          ],
+          const SizedBox(width: 8),
+          OutlinedButton.icon(
+            onPressed: scanner.isScanning ? scanner.stop : scanner.start,
+            icon: Icon(
+              scanner.isScanning ? Icons.pause : Icons.play_arrow,
+              size: 18,
+            ),
+            label: Text(scanner.isScanning ? 'Pause scan' : 'Start scan'),
           ),
         ],
       ),
-      body: SafeArea(child: body),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: (index) {
-          setState(() => _selectedIndex = index);
-        },
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.radar), label: 'Scan'),
-          NavigationDestination(icon: Icon(Icons.sensors), label: 'Advertise'),
-        ],
+    );
+  }
+}
+
+class _BorderIconButton extends StatelessWidget {
+  const _BorderIconButton({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: label,
+      child: SizedBox.square(
+        dimension: Gds.controlSm,
+        child: IconButton.outlined(
+          padding: EdgeInsets.zero,
+          visualDensity: VisualDensity.compact,
+          onPressed: onPressed,
+          icon: Icon(icon, size: 18),
+          style: IconButton.styleFrom(
+            side: const BorderSide(color: Gds.grey300),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(Gds.radiusSm),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -159,34 +536,69 @@ class ScanPage extends StatelessWidget {
         final devices = scanner.devices;
         return RefreshIndicator(
           onRefresh: scanner.refresh,
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-            children: [
-              _ScanStatusPanel(scanner: scanner, count: devices.length),
-              const SizedBox(height: 12),
-              if (devices.isEmpty)
-                _EmptyScanState(scanner: scanner)
-              else
-                for (final device in devices) ...[
-                  _BeaconTile(
-                    device: device,
-                    annotation: annotationStore.annotationFor(device.id),
-                    onTap: () => showModalBottomSheet<void>(
-                      context: context,
-                      isScrollControlled: true,
-                      useSafeArea: true,
-                      builder: (_) => BeaconDetailSheet(
-                        device: device,
-                        annotationStore: annotationStore,
-                      ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final horizontal = constraints.maxWidth >= 820 ? 36.0 : 16.0;
+              return ListView(
+                padding: EdgeInsets.fromLTRB(horizontal, 20, horizontal, 28),
+                children: [
+                  _PageHeader(
+                    title: 'Beacon inventory',
+                    trailing: OutlinedButton.icon(
+                      onPressed: scanner.refresh,
+                      icon: const Icon(Icons.refresh, size: 18),
+                      label: const Text('Refresh'),
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 24),
+                  _ScanStatusPanel(scanner: scanner, count: devices.length),
+                  const SizedBox(height: 12),
+                  if (devices.isEmpty)
+                    _EmptyScanState(scanner: scanner)
+                  else
+                    for (final device in devices)
+                      Padding(
+                        key: ValueKey('beacon-tile-${device.id}'),
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: _BeaconTile(
+                          device: device,
+                          annotation: annotationStore.annotationFor(device.id),
+                          onTap: () => showModalBottomSheet<void>(
+                            context: context,
+                            isScrollControlled: true,
+                            useSafeArea: true,
+                            builder: (_) => BeaconDetailSheet(
+                              device: device,
+                              annotationStore: annotationStore,
+                            ),
+                          ),
+                        ),
+                      ),
                 ],
-            ],
+              );
+            },
           ),
         );
       },
+    );
+  }
+}
+
+class _PageHeader extends StatelessWidget {
+  const _PageHeader({required this.title, this.trailing});
+
+  final String title;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(title, style: Theme.of(context).textTheme.headlineMedium),
+        ),
+        ?trailing,
+      ],
     );
   }
 }
@@ -199,19 +611,33 @@ class _ScanStatusPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
     return DecoratedBox(
       decoration: BoxDecoration(
-        border: Border.all(color: colors.outlineVariant),
-        borderRadius: BorderRadius.circular(8),
+        color: Gds.grey0,
+        border: Border.all(color: Gds.grey300),
+        borderRadius: BorderRadius.circular(Gds.radiusMd),
       ),
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Row(
           children: [
-            Icon(
-              scanner.isScanning ? Icons.bluetooth_searching : Icons.bluetooth,
-              color: scanner.isSupported ? colors.primary : colors.error,
+            Container(
+              width: 36,
+              height: 36,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: scanner.isSupported ? Gds.blue50 : Gds.red50,
+                borderRadius: BorderRadius.circular(Gds.radiusSm),
+              ),
+              child: Icon(
+                scanner.isScanning
+                    ? Icons.bluetooth_searching
+                    : Icons.bluetooth,
+                size: 20,
+                color: scanner.isSupported
+                    ? Gds.googleBlue700
+                    : Gds.googleRed600,
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -220,22 +646,24 @@ class _ScanStatusPanel extends StatelessWidget {
                 children: [
                   Text(
                     scanner.statusText,
-                    style: Theme.of(context).textTheme.bodyMedium,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.titleMedium?.copyWith(fontSize: 14),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     '$count visible ${count == 1 ? 'device' : 'devices'}',
-                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      color: colors.onSurfaceVariant,
-                    ),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.labelMedium?.copyWith(color: Gds.grey700),
                   ),
                 ],
               ),
             ),
-            IconButton.filledTonal(
-              tooltip: 'Refresh scan',
+            _BorderIconButton(
+              icon: Icons.refresh,
+              label: 'Refresh scan',
               onPressed: scanner.refresh,
-              icon: const Icon(Icons.refresh),
             ),
           ],
         ),
@@ -252,25 +680,32 @@ class _EmptyScanState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final colors = Theme.of(context).colorScheme;
     return SizedBox(
       height: MediaQuery.sizeOf(context).height * 0.48,
       child: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.radar, size: 48, color: colors.tertiary),
-            const SizedBox(height: 12),
-            Text('No beacon packets yet', style: textTheme.titleMedium),
-            const SizedBox(height: 6),
-            Text(
-              scanner.isScanning ? 'Listening now' : 'Scan is paused',
-              style: textTheme.bodyMedium?.copyWith(
-                color: colors.onSurfaceVariant,
-              ),
+            const Icon(
+              Icons.bluetooth_searching,
+              size: 38,
+              color: Gds.googleBlue700,
             ),
             const SizedBox(height: 16),
-            FilledButton.icon(
+            Text(
+              'No beacon packets yet',
+              style: textTheme.headlineMedium?.copyWith(
+                color: Gds.grey700,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              scanner.isScanning ? 'Listening now' : 'Scan is paused',
+              style: textTheme.bodyMedium?.copyWith(color: Gds.grey700),
+            ),
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
               onPressed: scanner.refresh,
               icon: const Icon(Icons.refresh),
               label: const Text('Refresh'),
@@ -295,7 +730,6 @@ class _BeaconTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
     final note = annotation?.note.trim();
     return Card(
       clipBehavior: Clip.antiAlias,
@@ -322,15 +756,19 @@ class _BeaconTile extends StatelessWidget {
                       device.subtitle,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: colors.onSurfaceVariant,
-                      ),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: Gds.grey700),
                     ),
                     if (note != null && note.isNotEmpty) ...[
                       const SizedBox(height: 8),
                       Row(
                         children: [
-                          Icon(Icons.label, size: 16, color: colors.secondary),
+                          const Icon(
+                            Icons.label,
+                            size: 16,
+                            color: Gds.googleBlue700,
+                          ),
                           const SizedBox(width: 4),
                           Expanded(
                             child: Text(
@@ -354,13 +792,13 @@ class _BeaconTile extends StatelessWidget {
                   const SizedBox(height: 8),
                   Text(
                     _relativeAge(device.lastSeen),
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: colors.onSurfaceVariant,
-                    ),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.labelSmall?.copyWith(color: Gds.grey700),
                   ),
                   if (annotation?.imagePath != null) ...[
                     const SizedBox(height: 6),
-                    Icon(Icons.image, size: 18, color: colors.primary),
+                    const Icon(Icons.image, size: 18, color: Gds.googleBlue700),
                   ],
                 ],
               ),
@@ -379,25 +817,32 @@ class _ProtocolBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    final (icon, color) = switch (kind) {
-      BeaconKind.iBeacon => (Icons.adjust, colors.primary),
-      BeaconKind.eddystoneUid => (Icons.tag, colors.secondary),
-      BeaconKind.eddystoneUrl => (Icons.link, colors.tertiary),
-      BeaconKind.eddystoneTlm => (Icons.monitor_heart, colors.error),
-      BeaconKind.ble => (Icons.bluetooth, colors.onSurfaceVariant),
+    final (icon, color, fill) = switch (kind) {
+      BeaconKind.iBeacon => (Icons.adjust, Gds.googleBlue700, Gds.blue50),
+      BeaconKind.eddystoneUid => (Icons.tag, Gds.googleGreen700, Gds.green50),
+      BeaconKind.eddystoneUrl => (
+        Icons.link,
+        Gds.googleYellow700,
+        Gds.yellow50,
+      ),
+      BeaconKind.eddystoneTlm => (
+        Icons.monitor_heart,
+        Gds.googleRed600,
+        Gds.red50,
+      ),
+      BeaconKind.ble => (Icons.bluetooth, Gds.grey700, Gds.grey100),
     };
     return Tooltip(
       message: kind.label,
       child: Container(
-        width: 44,
-        height: 44,
+        width: 40,
+        height: 40,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(8),
+          color: fill,
+          borderRadius: BorderRadius.circular(Gds.radiusSm),
         ),
-        child: Icon(icon, color: color),
+        child: Icon(icon, size: 20, color: color),
       ),
     );
   }
@@ -410,13 +855,13 @@ class _RssiChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
     return Container(
       constraints: const BoxConstraints(minWidth: 60),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: colors.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(8),
+        color: Gds.grey50,
+        border: Border.all(color: Gds.grey300),
+        borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         '$rssi dBm',
@@ -463,10 +908,9 @@ class _BeaconDetailSheetState extends State<BeaconDetailSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     return Padding(
-      padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + bottomInset),
+      padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottomInset),
       child: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -488,9 +932,9 @@ class _BeaconDetailSheetState extends State<BeaconDetailSheet> {
                       ),
                       Text(
                         widget.device.kind.label,
-                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                          color: colors.onSurfaceVariant,
-                        ),
+                        style: Theme.of(
+                          context,
+                        ).textTheme.labelLarge?.copyWith(color: Gds.grey700),
                       ),
                     ],
                   ),
@@ -620,7 +1064,6 @@ class _ImagePreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
     final existingPath = path;
     final file = existingPath == null ? null : File(existingPath);
     final exists = file?.existsSync() ?? false;
@@ -628,18 +1071,19 @@ class _ImagePreview extends StatelessWidget {
       aspectRatio: 16 / 9,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: colors.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(8),
+          color: Gds.grey50,
+          border: Border.all(color: Gds.grey300),
+          borderRadius: BorderRadius.circular(Gds.radiusMd),
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(Gds.radiusMd),
           child: exists
               ? Image.file(file!, fit: BoxFit.cover)
               : Center(
                   child: Icon(
                     Icons.add_photo_alternate,
                     size: 40,
-                    color: colors.onSurfaceVariant,
+                    color: Gds.grey600,
                   ),
                 ),
         ),
@@ -671,8 +1115,9 @@ class _DetailRows extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-        borderRadius: BorderRadius.circular(8),
+        color: Gds.grey0,
+        border: Border.all(color: Gds.grey300),
+        borderRadius: BorderRadius.circular(Gds.radiusMd),
       ),
       child: Column(
         children: [
@@ -686,7 +1131,9 @@ class _DetailRows extends StatelessWidget {
                     width: 108,
                     child: Text(
                       row.$1,
-                      style: Theme.of(context).textTheme.labelMedium,
+                      style: Theme.of(
+                        context,
+                      ).textTheme.labelMedium?.copyWith(color: Gds.grey700),
                     ),
                   ),
                   Expanded(
@@ -750,117 +1197,105 @@ class _AdvertisePageState extends State<AdvertisePage> {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
     final capability = _capabilities;
     final canStart = !_busy && _canAdvertiseSelectedMode(capability);
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-      children: [
-        DecoratedBox(
-          decoration: BoxDecoration(
-            border: Border.all(color: colors.outlineVariant),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final horizontal = constraints.maxWidth >= 820 ? 36.0 : 16.0;
+        return ListView(
+          padding: EdgeInsets.fromLTRB(horizontal, 20, horizontal, 28),
+          children: [
+            _PageHeader(
+              title: 'Advertise mode',
+              trailing: OutlinedButton.icon(
+                onPressed: _busy ? null : _loadCapabilities,
+                icon: const Icon(Icons.sync, size: 18),
+                label: const Text('Reload'),
+              ),
+            ),
+            const SizedBox(height: 24),
+            _AdvertiseStatusPanel(
+              isAdvertising: _isAdvertising,
+              status: _status,
+              busy: _busy,
+            ),
+            const SizedBox(height: 16),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: SegmentedButton<AdvertiseMode>(
+                segments: const [
+                  ButtonSegment(
+                    value: AdvertiseMode.iBeacon,
+                    icon: Icon(Icons.adjust),
+                    label: Text('iBeacon'),
+                  ),
+                  ButtonSegment(
+                    value: AdvertiseMode.eddystoneUid,
+                    icon: Icon(Icons.tag),
+                    label: Text('UID'),
+                  ),
+                  ButtonSegment(
+                    value: AdvertiseMode.eddystoneUrl,
+                    icon: Icon(Icons.link),
+                    label: Text('URL'),
+                  ),
+                ],
+                selected: {_mode},
+                onSelectionChanged: _busy
+                    ? null
+                    : (selection) => setState(() => _mode = selection.first),
+              ),
+            ),
+            const SizedBox(height: 16),
+            _GeminiFocusPanel(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 180),
+                child: switch (_mode) {
+                  AdvertiseMode.iBeacon => _IBeaconForm(
+                    key: const ValueKey('ibeacon-form'),
+                    uuidController: _uuidController,
+                    majorController: _majorController,
+                    minorController: _minorController,
+                    measuredPowerController: _measuredPowerController,
+                  ),
+                  AdvertiseMode.eddystoneUid => _EddystoneUidForm(
+                    key: const ValueKey('eddystone-uid-form'),
+                    namespaceController: _namespaceController,
+                    instanceController: _instanceController,
+                    measuredPowerController: _measuredPowerController,
+                  ),
+                  AdvertiseMode.eddystoneUrl => _EddystoneUrlForm(
+                    key: const ValueKey('eddystone-url-form'),
+                    urlController: _urlController,
+                    measuredPowerController: _measuredPowerController,
+                  ),
+                },
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
               children: [
-                Icon(
-                  _isAdvertising ? Icons.sensors : Icons.sensors_off,
-                  color: _isAdvertising
-                      ? colors.primary
-                      : colors.onSurfaceVariant,
+                FilledButton.icon(
+                  onPressed: canStart ? _startAdvertising : null,
+                  icon: _busy
+                      ? const SizedBox.square(
+                          dimension: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.cell_tower, size: 18),
+                  label: const Text('Start advertising'),
                 ),
                 const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    _status,
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ),
-                IconButton.filledTonal(
-                  tooltip: 'Reload capabilities',
-                  onPressed: _busy ? null : _loadCapabilities,
-                  icon: const Icon(Icons.sync),
+                OutlinedButton.icon(
+                  onPressed: _busy || !_isAdvertising ? null : _stopAdvertising,
+                  icon: const Icon(Icons.stop, size: 18),
+                  label: const Text('Stop'),
                 ),
               ],
             ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        SegmentedButton<AdvertiseMode>(
-          segments: const [
-            ButtonSegment(
-              value: AdvertiseMode.iBeacon,
-              icon: Icon(Icons.adjust),
-              label: Text('iBeacon'),
-            ),
-            ButtonSegment(
-              value: AdvertiseMode.eddystoneUid,
-              icon: Icon(Icons.tag),
-              label: Text('UID'),
-            ),
-            ButtonSegment(
-              value: AdvertiseMode.eddystoneUrl,
-              icon: Icon(Icons.link),
-              label: Text('URL'),
-            ),
           ],
-          selected: {_mode},
-          onSelectionChanged: _busy
-              ? null
-              : (selection) => setState(() => _mode = selection.first),
-        ),
-        const SizedBox(height: 16),
-        AnimatedSwitcher(
-          duration: const Duration(milliseconds: 180),
-          child: switch (_mode) {
-            AdvertiseMode.iBeacon => _IBeaconForm(
-              key: const ValueKey('ibeacon-form'),
-              uuidController: _uuidController,
-              majorController: _majorController,
-              minorController: _minorController,
-              measuredPowerController: _measuredPowerController,
-            ),
-            AdvertiseMode.eddystoneUid => _EddystoneUidForm(
-              key: const ValueKey('eddystone-uid-form'),
-              namespaceController: _namespaceController,
-              instanceController: _instanceController,
-              measuredPowerController: _measuredPowerController,
-            ),
-            AdvertiseMode.eddystoneUrl => _EddystoneUrlForm(
-              key: const ValueKey('eddystone-url-form'),
-              urlController: _urlController,
-              measuredPowerController: _measuredPowerController,
-            ),
-          },
-        ),
-        const SizedBox(height: 20),
-        Row(
-          children: [
-            Expanded(
-              child: FilledButton.icon(
-                onPressed: canStart ? _startAdvertising : null,
-                icon: _busy
-                    ? const SizedBox.square(
-                        dimension: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.cell_tower),
-                label: const Text('Start'),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: _busy || !_isAdvertising ? null : _stopAdvertising,
-                icon: const Icon(Icons.stop),
-                label: const Text('Stop'),
-              ),
-            ),
-          ],
-        ),
-      ],
+        );
+      },
     );
   }
 
@@ -1007,6 +1442,115 @@ class _AdvertisePageState extends State<AdvertisePage> {
       _status = status;
       _busy = false;
     });
+  }
+}
+
+class _AdvertiseStatusPanel extends StatelessWidget {
+  const _AdvertiseStatusPanel({
+    required this.isAdvertising,
+    required this.status,
+    required this.busy,
+  });
+
+  final bool isAdvertising;
+  final String status;
+  final bool busy;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Gds.grey0,
+        border: Border.all(color: Gds.grey300),
+        borderRadius: BorderRadius.circular(Gds.radiusMd),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: isAdvertising ? Gds.blue50 : Gds.grey100,
+                borderRadius: BorderRadius.circular(Gds.radiusSm),
+              ),
+              child: Icon(
+                isAdvertising ? Icons.sensors : Icons.sensors_off,
+                size: 20,
+                color: isAdvertising ? Gds.googleBlue700 : Gds.grey700,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    status,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.titleMedium?.copyWith(fontSize: 14),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    busy ? 'Checking capabilities' : 'Local radio profile',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.labelMedium?.copyWith(color: Gds.grey700),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GeminiFocusPanel extends StatelessWidget {
+  const _GeminiFocusPanel({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            child: ImageFiltered(
+              imageFilter: ui.ImageFilter.blur(sigmaX: 26, sigmaY: 26),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(28),
+                  gradient: SweepGradient(
+                    colors: [
+                      Gds.googleBlue.withValues(alpha: 0.22),
+                      Gds.googleRed600.withValues(alpha: 0.18),
+                      Gds.googleYellow700.withValues(alpha: 0.16),
+                      Gds.googleGreen700.withValues(alpha: 0.18),
+                      Gds.googleBlue.withValues(alpha: 0.22),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: Gds.grey0,
+            border: Border.all(color: Gds.grey300),
+            borderRadius: BorderRadius.circular(Gds.radiusMd),
+          ),
+          child: Padding(padding: const EdgeInsets.all(16), child: child),
+        ),
+      ],
+    );
   }
 }
 
