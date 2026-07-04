@@ -24,6 +24,16 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Scan nearby Bluetooth beacon packets and advertise an iBeacon profile.</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>Advertise an iBeacon profile from this device.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Attach a photo to a saved beacon label.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Allow Bluetooth beacon discovery while the app is open.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Select an image for a saved beacon label.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
