@@ -518,7 +518,9 @@ class _BorderIconButton extends StatelessWidget {
   }
 }
 
-class ScanPage extends StatelessWidget {
+enum _ScanSortMode { scannerOrder, signalStrength }
+
+class ScanPage extends StatefulWidget {
   const ScanPage({
     super.key,
     required this.scanner,
@@ -529,13 +531,40 @@ class ScanPage extends StatelessWidget {
   final BeaconAnnotationStore annotationStore;
 
   @override
+  State<ScanPage> createState() => _ScanPageState();
+}
+
+class _ScanPageState extends State<ScanPage> {
+  final _searchController = TextEditingController();
+  _ScanSortMode _sortMode = _ScanSortMode.scannerOrder;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(_onSearchChanged);
+  }
+
+  @override
+  void dispose() {
+    _searchController
+      ..removeListener(_onSearchChanged)
+      ..dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged() {
+    setState(() {});
+  }
+
+  @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: Listenable.merge([scanner, annotationStore]),
+      animation: Listenable.merge([widget.scanner, widget.annotationStore]),
       builder: (context, _) {
-        final devices = scanner.devices;
+        final devices = widget.scanner.devices;
+        final visibleDevices = _visibleDevices(devices);
         return RefreshIndicator(
-          onRefresh: scanner.refresh,
+          onRefresh: widget.scanner.refresh,
           child: LayoutBuilder(
             builder: (context, constraints) {
               final horizontal = constraints.maxWidth >= 820 ? 36.0 : 16.0;
@@ -545,31 +574,50 @@ class ScanPage extends StatelessWidget {
                   _PageHeader(
                     title: 'Beacon inventory',
                     trailing: OutlinedButton.icon(
-                      onPressed: scanner.refresh,
+                      onPressed: widget.scanner.refresh,
                       icon: const Icon(Icons.refresh, size: 18),
                       label: const Text('Refresh'),
                     ),
                   ),
                   const SizedBox(height: 24),
-                  _ScanStatusPanel(scanner: scanner, count: devices.length),
+                  _ScanStatusPanel(
+                    scanner: widget.scanner,
+                    count: visibleDevices.length,
+                  ),
+                  const SizedBox(height: 12),
+                  _ScanControls(
+                    searchController: _searchController,
+                    sortMode: _sortMode,
+                    onSortModeChanged: (mode) {
+                      setState(() => _sortMode = mode);
+                    },
+                    onClearSearch: _searchController.clear,
+                  ),
                   const SizedBox(height: 12),
                   if (devices.isEmpty)
-                    _EmptyScanState(scanner: scanner)
+                    _EmptyScanState(scanner: widget.scanner)
+                  else if (visibleDevices.isEmpty)
+                    _NoSearchResults(
+                      query: _searchController.text,
+                      onClearSearch: _searchController.clear,
+                    )
                   else
-                    for (final device in devices)
+                    for (final device in visibleDevices)
                       Padding(
                         key: ValueKey('beacon-tile-${device.id}'),
                         padding: const EdgeInsets.only(bottom: 8),
                         child: _BeaconTile(
                           device: device,
-                          annotation: annotationStore.annotationFor(device.id),
+                          annotation: widget.annotationStore.annotationFor(
+                            device.id,
+                          ),
                           onTap: () => showModalBottomSheet<void>(
                             context: context,
                             isScrollControlled: true,
                             useSafeArea: true,
                             builder: (_) => BeaconDetailSheet(
                               device: device,
-                              annotationStore: annotationStore,
+                              annotationStore: widget.annotationStore,
                             ),
                           ),
                         ),
@@ -579,6 +627,162 @@ class ScanPage extends StatelessWidget {
             },
           ),
         );
+      },
+    );
+  }
+
+  List<BeaconDevice> _visibleDevices(List<BeaconDevice> devices) {
+    final query = _normalizeSearchText(_searchController.text);
+    final filtered = query.isEmpty
+        ? devices.toList()
+        : devices
+              .where((device) => _matchesSearch(device, query))
+              .toList(growable: false);
+
+    if (_sortMode == _ScanSortMode.scannerOrder) {
+      return filtered;
+    }
+
+    final scannerOrder = {
+      for (var index = 0; index < devices.length; index++)
+        devices[index].id: index,
+    };
+    filtered.sort((a, b) {
+      final bySignal = b.rssi.compareTo(a.rssi);
+      if (bySignal != 0) {
+        return bySignal;
+      }
+      return (scannerOrder[a.id] ?? 0).compareTo(scannerOrder[b.id] ?? 0);
+    });
+    return filtered;
+  }
+
+  bool _matchesSearch(BeaconDevice device, String query) {
+    final normalizedRemoteId = _normalizeSearchText(device.remoteId);
+    final normalizedMac = _normalizeMacAddress(device.remoteId);
+    final normalizedQueryMac = _normalizeMacAddress(query);
+    final searchableText = [
+      device.displayName,
+      device.title,
+      device.remoteId,
+    ].map(_normalizeSearchText);
+
+    if (searchableText.any((value) => value.contains(query))) {
+      return true;
+    }
+    if (normalizedRemoteId.contains(query)) {
+      return true;
+    }
+    return _isMacLikeQuery(query, normalizedQueryMac) &&
+        normalizedMac.contains(normalizedQueryMac);
+  }
+}
+
+String _normalizeSearchText(String value) => value.trim().toLowerCase();
+
+String _normalizeMacAddress(String value) {
+  return _normalizeSearchText(value).replaceAll(RegExp(r'[^a-f0-9]'), '');
+}
+
+bool _isMacLikeQuery(String query, String normalizedMacQuery) {
+  if (normalizedMacQuery.length >= 6) {
+    return true;
+  }
+  return RegExp(r'[:\-\s]').hasMatch(query) && normalizedMacQuery.length >= 2;
+}
+
+class _ScanControls extends StatelessWidget {
+  const _ScanControls({
+    required this.searchController,
+    required this.sortMode,
+    required this.onSortModeChanged,
+    required this.onClearSearch,
+  });
+
+  final TextEditingController searchController;
+  final _ScanSortMode sortMode;
+  final ValueChanged<_ScanSortMode> onSortModeChanged;
+  final VoidCallback onClearSearch;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final search = TextField(
+          key: const ValueKey('scan-search-field'),
+          controller: searchController,
+          textInputAction: TextInputAction.search,
+          decoration: InputDecoration(
+            prefixIcon: const Icon(Icons.search),
+            labelText: 'Search name or MAC',
+            suffixIcon: searchController.text.isEmpty
+                ? null
+                : IconButton(
+                    tooltip: 'Clear search',
+                    onPressed: onClearSearch,
+                    icon: const Icon(Icons.close, size: 18),
+                  ),
+          ),
+        );
+        final sort = _SortModeSelector(
+          sortMode: sortMode,
+          onSortModeChanged: onSortModeChanged,
+        );
+
+        if (constraints.maxWidth >= 700) {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: search),
+              const SizedBox(width: 12),
+              sort,
+            ],
+          );
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            search,
+            const SizedBox(height: 10),
+            Align(alignment: Alignment.centerLeft, child: sort),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _SortModeSelector extends StatelessWidget {
+  const _SortModeSelector({
+    required this.sortMode,
+    required this.onSortModeChanged,
+  });
+
+  final _ScanSortMode sortMode;
+  final ValueChanged<_ScanSortMode> onSortModeChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return SegmentedButton<_ScanSortMode>(
+      showSelectedIcon: false,
+      segments: const [
+        ButtonSegment(
+          value: _ScanSortMode.scannerOrder,
+          icon: Icon(Icons.format_list_numbered),
+          label: Text('Order'),
+          tooltip: 'Scanner order',
+        ),
+        ButtonSegment(
+          value: _ScanSortMode.signalStrength,
+          icon: Icon(Icons.signal_cellular_alt),
+          label: Text('Signal'),
+          tooltip: 'Signal strength',
+        ),
+      ],
+      selected: {sortMode},
+      onSelectionChanged: (selection) {
+        onSortModeChanged(selection.first);
       },
     );
   }
@@ -709,6 +913,47 @@ class _EmptyScanState extends StatelessWidget {
               onPressed: scanner.refresh,
               icon: const Icon(Icons.refresh),
               label: const Text('Refresh'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NoSearchResults extends StatelessWidget {
+  const _NoSearchResults({required this.query, required this.onClearSearch});
+
+  final String query;
+  final VoidCallback onClearSearch;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return SizedBox(
+      height: MediaQuery.sizeOf(context).height * 0.36,
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.search_off, size: 36, color: Gds.grey600),
+            const SizedBox(height: 14),
+            Text(
+              'No matching beacons',
+              style: textTheme.titleLarge?.copyWith(color: Gds.grey700),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '"${query.trim()}"',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: textTheme.bodyMedium?.copyWith(color: Gds.grey700),
+            ),
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              onPressed: onClearSearch,
+              icon: const Icon(Icons.close),
+              label: const Text('Clear search'),
             ),
           ],
         ),
